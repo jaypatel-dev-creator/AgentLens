@@ -20,6 +20,7 @@ from app.db import models  # noqa: F401
 
 from app.agent.graph import compile_graph
 from app.rag.store import init_store
+from app.telemetry import setup_telemetry, shutdown_telemetry
 
 logger = get_logger(__name__)
 
@@ -30,14 +31,16 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
 
     setup_logging(settings.app_env)
-    logger.info("Starting NeuroGraph AI...")
+    logger.info("Starting AgentLens...")
 
-    # LangSmith
-    os.environ["LANGCHAIN_TRACING_V2"] = settings.langchain_tracing_v2
-    os.environ["LANGCHAIN_ENDPOINT"] = settings.langchain_endpoint
-    os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
-    os.environ["LANGCHAIN_PROJECT"] = settings.langchain_project
-    logger.info(f"LangSmith tracing active — project: {settings.langchain_project}")
+    # SigNoz — OpenTelemetry
+    setup_telemetry(
+        service_name=settings.otel_service_name,
+        service_version="1.0.0",
+        otlp_endpoint=settings.otlp_endpoint,
+        otlp_headers={"signoz-ingestion-key": settings.signoz_ingestion_key},
+    )
+    logger.info(f"SigNoz telemetry active — endpoint: {settings.otlp_endpoint}")
 
     # Tavily
     os.environ["TAVILY_API_KEY"] = settings.tavily_api_key
@@ -62,34 +65,35 @@ async def lifespan(app: FastAPI):
     if settings.database_url:
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
         conn_string = settings.database_url.replace("postgresql+psycopg://", "postgresql://", 1)
-        async with  AsyncPostgresSaver.from_conn_string(conn_string) as checkpointer:
+        async with AsyncPostgresSaver.from_conn_string(conn_string) as checkpointer:
             await checkpointer.setup()
         logger.info("LangGraph postgres checkpointer tables ready.")
 
     # RAG vector store initialization — ChromaDB local, Pinecone prod (env-driven)
     init_store()
 
-    logger.info("NeuroGraph AI is ready.")
+    logger.info("AgentLens is ready.")
     yield
 
     # --- Shutdown ---
     await engine.dispose()
-    logger.info("Shutting down NeuroGraph AI...")
+    shutdown_telemetry()
+    logger.info("Shutting down AgentLens...")
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="NeuroGraph AI",
-        description="LangGraph ReAct agent with STM, LTM, and Tools",
+        title="AgentLens",
+        description="Observable agentic RAG — every agent decision traced in SigNoz",
         version="1.0.0",
         docs_url="/docs" if settings.app_env == "development" else None,
         redoc_url=None,
         lifespan=lifespan,
     )
 
-    allowed_origins = [settings.frontend_url, "https://neuro-graph-ai.vercel.app"]
+    allowed_origins = [settings.frontend_url, "https://agent-lens.vercel.app"]
 
     app.add_middleware(
         CORSMiddleware,

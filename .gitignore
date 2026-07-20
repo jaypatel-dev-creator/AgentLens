@@ -89,3 +89,5 @@ yarn.lock
 *.tmp
 *.temp
 .cache/
+
+start.bat

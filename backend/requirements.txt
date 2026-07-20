@@ -49,3 +49,9 @@ pymupdf==1.27.2.3
 google-genai==2.7.0
 chromadb==1.5.9
 pinecone==9.1.0
+
+# OpenTelemetry — SigNoz
+opentelemetry-sdk==1.29.0
+opentelemetry-exporter-otlp-proto-grpc==1.29.0
+openinference-instrumentation-langchain==0.1.29
+opentelemetry-instrumentation-fastapi==0.50b0
