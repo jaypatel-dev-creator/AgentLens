@@ -37,7 +37,7 @@ export default function AuthPage() {
         {/* Logo / wordmark */}
         <div className="mb-8 text-center">
           <span className="text-2xl font-semibold tracking-tight text-gray-900">
-            NeuroGraph AI
+            AgentLens
           </span>
           <p className="mt-1 text-sm text-gray-500">
             {isLogin ? 'Sign in to continue' : 'Create an account'}

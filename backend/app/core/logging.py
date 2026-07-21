@@ -3,7 +3,13 @@ import sys
 
 
 def setup_logging(app_env: str = "development") -> None:
-    log_level = logging.DEBUG if app_env == "development" else logging.INFO # for local set log level to debug, for prod, set to info. 
+    log_level = logging.DEBUG if app_env == "development" else logging.INFO
+
+    try:
+        from opentelemetry.instrumentation.logging import LoggingInstrumentor
+        LoggingInstrumentor().instrument(set_logging_format=False)
+    except ImportError:
+        pass  # package not installed — silently skip, app still works
 
     logging.basicConfig(
         level=log_level,
@@ -12,7 +18,7 @@ def setup_logging(app_env: str = "development") -> None:
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    # Silencing  noisy third-party loggers — only show WARNING and above
+    # Silence noisy third-party loggers — only show WARNING and above
     for noisy in [
         "httpx",
         "httpcore",

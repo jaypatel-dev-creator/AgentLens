@@ -1,12 +1,17 @@
+import time
+
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage
 from langchain_core.tools import BaseTool
+from opentelemetry import trace
 
 from app.agent.state import AgentState
 from app.core.config import get_settings
 from app.core.logging import get_logger
+import app.telemetry as tel
 
 logger = get_logger(__name__)
+_tracer = trace.get_tracer("agentlens.reasoner")
 
 
 # used in graph.py in compile_graph() function to bind llm with tools
@@ -107,6 +112,48 @@ async def reasoner_node(
     )
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
 
-    response = await llm_with_tools.ainvoke(messages)
+    with _tracer.start_as_current_span("agentlens.reasoner") as span:
+        span.set_attribute("llm.model", "gemini-3.1-flash-lite")
+        span.set_attribute("llm.message_count", len(messages))
+        span.set_attribute("llm.has_ltm_context", bool(state.get("ltm_context")))
+        span.set_attribute("llm.has_doc_context", bool(state.get("doc_context")))
+        span.set_attribute("llm.tool_count", len(tools))
+
+        t0 = time.perf_counter()
+        response = await llm_with_tools.ainvoke(messages)
+        latency_ms = (time.perf_counter() - t0) * 1000
+
+        input_tokens = 0
+        output_tokens = 0
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            input_tokens = response.usage_metadata.get("input_tokens", 0)
+            output_tokens = response.usage_metadata.get("output_tokens", 0)
+
+        total_tokens = input_tokens + output_tokens
+
+        span.set_attribute("llm.input_tokens", input_tokens)
+        span.set_attribute("llm.output_tokens", output_tokens)
+        span.set_attribute("llm.total_tokens", total_tokens)
+        span.set_attribute("llm.latency_ms", round(latency_ms, 2))
+        span.set_attribute("llm.tool_calls_requested", len(getattr(response, "tool_calls", []) or []))
+
+        if tel.token_cost_counter and total_tokens:
+            tel.token_cost_counter.add(
+                total_tokens,
+                {"llm.model": "gemini-3.1-flash-lite", "token.type": "total"},
+            )
+        if tel.llm_latency_histogram:
+            tel.llm_latency_histogram.record(
+                latency_ms,
+                {"llm.model": "gemini-3.1-flash-lite"},
+            )
+
+        logger.info(
+            "Reasoner complete — tokens: %d in / %d out | latency: %.1fms | tool_calls: %d",
+            input_tokens,
+            output_tokens,
+            latency_ms,
+            len(getattr(response, "tool_calls", []) or []),
+        )
 
     return {"messages": [response]}

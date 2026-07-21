@@ -1,9 +1,14 @@
+import time
 from pathlib import Path
+from opentelemetry import trace
+
 from app.core.exceptions import RAGException
 from app.core.config import get_settings
 from app.core.logging import get_logger
+import app.telemetry as tel
 
 logger = get_logger(__name__)
+_tracer = trace.get_tracer("agentlens.rag")
 
 COLLECTION_NAME = "neurograph_docs"
 EMBEDDING_DIMENSION = 768
@@ -68,28 +73,60 @@ class ChromaVectorStore:
         k: int = 3,
         threshold: float = 0.5,
     ) -> list[dict]:
-        count = self.collection.count()
-        if count == 0:
-            return []
-        n_results = min(k, count)
+        with _tracer.start_as_current_span("agentlens.rag.query") as span:
+            span.set_attribute("rag.backend", "chroma")
+            span.set_attribute("rag.query_k", k)
+            span.set_attribute("rag.threshold", threshold)
+            span.set_attribute("rag.user_id", user_id)
 
-        results = self.collection.query(
-            query_embeddings=[embedding],
-            n_results=n_results,
-            where={"user_id": {"$eq": user_id}},
-            include=["documents", "metadatas", "distances"],
-        )
-        chunks = []
-        for doc, meta, distance in zip(
-            results["documents"][0],
-            results["metadatas"][0],
-            results["distances"][0],
-        ):
-            similarity = 1 - distance
-            if similarity >= threshold:
-                chunks.append({"document": doc, "metadata": meta})
+            t0 = time.perf_counter()
 
-        return chunks
+            count = self.collection.count()
+            if count == 0:
+                latency_ms = (time.perf_counter() - t0) * 1000
+                span.set_attribute("rag.results_returned", 0)
+                span.set_attribute("rag.latency_ms", round(latency_ms, 2))
+                span.set_attribute("rag.skipped", True)
+                return []
+
+            n_results = min(k, count)
+            results = self.collection.query(
+                query_embeddings=[embedding],
+                n_results=n_results,
+                where={"user_id": {"$eq": user_id}},
+                include=["documents", "metadatas", "distances"],
+            )
+
+            chunks = []
+            for doc, meta, distance in zip(
+                results["documents"][0],
+                results["metadatas"][0],
+                results["distances"][0],
+            ):
+                similarity = 1 - distance
+                if similarity >= threshold:
+                    chunks.append({"document": doc, "metadata": meta})
+
+            latency_ms = (time.perf_counter() - t0) * 1000
+
+            span.set_attribute("rag.results_returned", len(chunks))
+            span.set_attribute("rag.latency_ms", round(latency_ms, 2))
+            span.set_attribute("rag.skipped", False)
+
+            if tel.retrieval_latency_histogram:
+                tel.retrieval_latency_histogram.record(
+                    latency_ms,
+                    {"rag.backend": "chroma"},
+                )
+
+            logger.info(
+                "RAG query chroma — results: %d/%d | latency: %.1fms",
+                len(chunks),
+                n_results,
+                latency_ms,
+            )
+
+            return chunks
 
     def delete_by_sha256(self, sha256: str, user_id: str) -> None:
         self.collection.delete(where={"$and": [
@@ -132,19 +169,46 @@ class PineconeVectorStore:
         k: int = 3,
         threshold: float = 0.5,
     ) -> list[dict]:
-        results = self.index.query(
-            vector=embedding,
-            top_k=k,
-            filter={"user_id": {"$eq": user_id}},
-            include_metadata=True,
-        )
-        chunks = []
-        for match in results["matches"]:
-            if match["score"] >= threshold:
-                meta = dict(match["metadata"])
-                text = meta.pop("text", "")
-                chunks.append({"document": text, "metadata": meta})
-        return chunks
+        with _tracer.start_as_current_span("agentlens.rag.query") as span:
+            span.set_attribute("rag.backend", "pinecone")
+            span.set_attribute("rag.query_k", k)
+            span.set_attribute("rag.threshold", threshold)
+            span.set_attribute("rag.user_id", user_id)
+
+            t0 = time.perf_counter()
+
+            results = self.index.query(
+                vector=embedding,
+                top_k=k,
+                filter={"user_id": {"$eq": user_id}},
+                include_metadata=True,
+            )
+
+            chunks = []
+            for match in results["matches"]:
+                if match["score"] >= threshold:
+                    meta = dict(match["metadata"])
+                    text = meta.pop("text", "")
+                    chunks.append({"document": text, "metadata": meta})
+
+            latency_ms = (time.perf_counter() - t0) * 1000
+
+            span.set_attribute("rag.results_returned", len(chunks))
+            span.set_attribute("rag.latency_ms", round(latency_ms, 2))
+
+            if tel.retrieval_latency_histogram:
+                tel.retrieval_latency_histogram.record(
+                    latency_ms,
+                    {"rag.backend": "pinecone"},
+                )
+
+            logger.info(
+                "RAG query pinecone — results: %d | latency: %.1fms",
+                len(chunks),
+                latency_ms,
+            )
+
+            return chunks
 
     def delete_by_sha256(self, sha256: str, user_id: str) -> None:
         """
@@ -168,5 +232,5 @@ class PineconeVectorStore:
         """
         prefix = f"{user_id}_{sha256}_"
         for _ in self.index.list(prefix=prefix):
-            return True  # short-circuit on first result
+            return True
         return False

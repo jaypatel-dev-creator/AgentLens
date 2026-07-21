@@ -77,8 +77,13 @@ def setup_telemetry(
     )
 
     # Auto-instrument LangChain/LangGraph — monkey-patches internals.
-    # Must run BEFORE any LangChain objects are instantiated.
-    LangChainInstrumentor().instrument()
+    # skip_dep_check=True suppresses the double-instrument warning that fires
+    # when the CLI wrapper has already partially instrumented the environment
+    # before this call runs.
+    if not LangChainInstrumentor().is_instrumented_by_opentelemetry:
+        LangChainInstrumentor().instrument(skip_dep_check=True)
+    else:
+        logger.debug("LangChainInstrumentor already active — skipping re-instrument.")
 
     logger.info(
         "AgentLens telemetry active — service: %s | endpoint: %s",

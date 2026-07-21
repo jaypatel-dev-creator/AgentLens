@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # SigNoz — OpenTelemetry
     otel_service_name: str = "agentlens"
-    otlp_endpoint: str = "https://ingest.in.signoz.cloud:443"
+    otlp_endpoint: str = "https://ingest.us2.signoz.cloud:443"
     signoz_ingestion_key: str
 
     # Tavily
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     pinecone_index_name: str = "agentlens-rag"
 
     # Auth — JWT
-    jwt_secret_key: str                
+    jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7   # 7 days
 

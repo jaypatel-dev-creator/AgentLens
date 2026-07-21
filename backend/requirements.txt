@@ -15,7 +15,6 @@ langgraph==1.2.2
 langgraph-checkpoint==4.1.1
 langgraph-checkpoint-sqlite==3.1.0
 langgraph-checkpoint-postgres==3.1.0
-langsmith==0.8.7
 
 # Database
 sqlalchemy==2.0.50
@@ -49,9 +48,12 @@ pymupdf==1.27.2.3
 google-genai==2.7.0
 chromadb==1.5.9
 pinecone==9.1.0
-
 # OpenTelemetry — SigNoz
-opentelemetry-sdk==1.29.0
-opentelemetry-exporter-otlp-proto-grpc==1.29.0
+opentelemetry-api==1.44.0
+opentelemetry-sdk==1.44.0
+opentelemetry-exporter-otlp-proto-grpc==1.44.0
+opentelemetry-distro==0.65b0
+opentelemetry-instrumentation==0.65b0
+opentelemetry-instrumentation-fastapi==0.65b0
+opentelemetry-instrumentation-logging==0.65b0
 openinference-instrumentation-langchain==0.1.29
-opentelemetry-instrumentation-fastapi==0.50b0

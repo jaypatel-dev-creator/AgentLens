@@ -39,7 +39,7 @@ export default function Sidebar() {
           <div className="flex items-center gap-2">
             <img src="/favicon.svg" alt="logo" className="w-5 h-5 flex-shrink-0" />
             <h1 className="text-base font-semibold text-gray-800 tracking-tight truncate">
-              NeuroGraph AI
+              Agent Lens
             </h1>
           </div>
         )}

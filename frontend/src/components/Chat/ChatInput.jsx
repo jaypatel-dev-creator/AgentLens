@@ -66,7 +66,7 @@ export default function ChatInput({ disabled }) {
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Message NeuroGraph AI..."
+        placeholder="Message AgentLens..."
         disabled={disabled}
         rows={1}
         className="flex-1 resize-none bg-transparent outline-none text-sm text-gray-800 placeholder-gray-400 max-h-32 overflow-y-auto disabled:opacity-50"

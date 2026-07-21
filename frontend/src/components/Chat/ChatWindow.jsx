@@ -24,7 +24,7 @@ export default function ChatWindow() {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <p className="text-2xl font-semibold text-gray-800 mb-2">
-            NeuroGraph AI
+            AgentLens
           </p>
           <p className="text-sm text-gray-400">
             Start a new conversation or select an existing one

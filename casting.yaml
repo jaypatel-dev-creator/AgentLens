@@ -1,0 +1,91 @@
+
+# SigNoz Cloud (us2 region) is used instead of self-hosted Foundry.
+
+version: "1.0"
+
+project:
+  name: agentlens
+  description: >
+    Agentic RAG system with LangGraph + Gemini, fully instrumented with
+    OpenTelemetry. Traces, metrics, and logs flow to SigNoz Cloud.
+    Agent can query its own observability data via SigNoz MCP.
+
+observability:
+  provider: signoz-cloud
+  region: us2
+  ingestion_endpoint: https://ingest.us2.signoz.cloud:443
+  protocol: otlp-grpc
+  service_name: agentlens
+  signals:
+    - traces
+    - metrics
+    - logs
+
+instrumentation:
+  auto:
+    - opentelemetry-instrumentation-fastapi
+    - openinference-instrumentation-langchain
+    - opentelemetry-instrumentation-logging
+  manual:
+    - agentlens.reasoner        # LLM call latency, token counts (input/output/total)
+    - agentlens.tool_executor   # Per-tool spans with input/output/latency/success
+    - agentlens.ltm             # Long-term memory read/write with record counts
+    - agentlens.rag             # Vector store retrieval latency (Chroma + Pinecone)
+
+metrics:
+  - name: agentlens.tokens.total
+    type: counter
+    unit: tokens
+    labels: [llm.model, token.type]
+  - name: agentlens.tool.calls.total
+    type: counter
+    unit: calls
+    labels: [tool.name, tool.success]
+  - name: agentlens.ltm.operations.total
+    type: counter
+    unit: operations
+    labels: [ltm.operation]
+  - name: agentlens.retrieval.latency
+    type: histogram
+    unit: ms
+    labels: [rag.backend]
+  - name: agentlens.llm.latency
+    type: histogram
+    unit: ms
+    labels: [llm.model]
+  - name: agentlens.sessions.active
+    type: updowncounter
+    unit: sessions
+
+services:
+  backend:
+    runtime: python
+    framework: fastapi
+    entrypoint: "opentelemetry-instrument uvicorn app.main:app --reload"
+    deploy: render
+    env_vars_required:
+      - GOOGLE_API_KEY
+      - SIGNOZ_INGESTION_KEY
+      - OTLP_ENDPOINT
+      - OTEL_SERVICE_NAME
+      - JWT_SECRET_KEY
+      - TAVILY_API_KEY
+
+  frontend:
+    runtime: node
+    framework: react-vite
+    deploy: vercel
+    env_vars_required:
+      - VITE_API_URL
+
+alerts:
+  - name: high_retrieval_latency
+    metric: agentlens.retrieval.latency
+    condition: p95 > 2000
+    unit: ms
+    severity: warning
+  - name: high_token_cost_per_session
+    metric: agentlens.tokens.total
+    condition: sum > 5000
+    window: 5m
+    severity: warning
