@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import client from '../api/client'
 
 const ChatContext = createContext(null)
@@ -29,13 +29,58 @@ export function ChatProvider({ children }) {
   const [showDocuments, setShowDocuments] = useState(false)
   const [uploadStatuses, setUploadStatuses] = useState([])
 
+  // --- Observability state ---
+  const [sessionMetrics, setSessionMetrics] = useState(null)
+  const [showObservability, setShowObservability] = useState(false)
+
   const doneCommittedRef = useRef(false)
   const showProfileRef = useRef(false)
   const memoryTimerRef = useRef(null)
-  const activeThreadIdRef = useRef(null)  // fix: ref to avoid stale closure in handleSSEEvent
+  const activeThreadIdRef = useRef(null)   // fix: ref to avoid stale closure in handleSSEEvent
+  const metricsPollerRef = useRef(null)    // holds the setInterval id for metrics polling
 
   showProfileRef.current = showProfile
   activeThreadIdRef.current = activeThreadId  // always current, no closure staleness
+
+  // --- Session metrics ---
+
+  const fetchSessionMetrics = useCallback(async (threadId) => {
+    if (!threadId) return
+    try {
+      const res = await client.get(`/metrics/session/${threadId}`)
+      setSessionMetrics(res.data)
+    } catch (err) {
+      // 404 means no metrics yet (stream not started or TTL expired) — not an error
+      if (err.response?.status !== 404) {
+        console.error('Failed to fetch session metrics:', err)
+      }
+    }
+  }, [])
+
+  // Start polling every 2s when stream begins, stop and do one final fetch when done
+  const startMetricsPolling = useCallback((threadId) => {
+    stopMetricsPolling()
+    metricsPollerRef.current = setInterval(() => {
+      fetchSessionMetrics(threadId)
+    }, 2000)
+  }, [fetchSessionMetrics])
+
+  const stopMetricsPolling = useCallback(() => {
+    if (metricsPollerRef.current) {
+      clearInterval(metricsPollerRef.current)
+      metricsPollerRef.current = null
+    }
+  }, [])
+
+  // Clear metrics when switching threads
+  useEffect(() => {
+    setSessionMetrics(null)
+  }, [activeThreadId])
+
+  // Cleanup poller on unmount
+  useEffect(() => {
+    return () => stopMetricsPolling()
+  }, [stopMetricsPolling])
 
   // --- Thread actions ---
 
@@ -70,7 +115,9 @@ export function ChatProvider({ children }) {
     } catch (err) {
       console.error('Failed to load history:', err)
     }
-  }, [])
+    // Fetch metrics for the selected thread — may return 404 if expired, that's fine
+    fetchSessionMetrics(threadId)
+  }, [fetchSessionMetrics])
 
   const renameThread = useCallback(async (threadId, title) => {
     try {
@@ -112,6 +159,9 @@ export function ChatProvider({ children }) {
       currentTool: null,
     })
 
+    // Start polling metrics as soon as the stream begins
+    startMetricsPolling(activeThreadId)
+
     try {
       // fetch() bypasses the axios interceptor — inject token manually
       const token = localStorage.getItem('auth_token')
@@ -150,8 +200,9 @@ export function ChatProvider({ children }) {
       console.error('Stream error:', err)
       setStreamingMessage(null)
       setIsStreaming(false)
+      stopMetricsPolling()
     }
-  }, [activeThreadId])
+  }, [activeThreadId, startMetricsPolling, stopMetricsPolling])
 
   const handleSSEEvent = useCallback((event) => {
     switch (event.type) {
@@ -232,6 +283,10 @@ export function ChatProvider({ children }) {
         setIsStreaming(false)
         refreshThreadTitle(activeThreadIdRef.current)  // fix: use ref, not stale closure value
 
+        // Stop polling and do one final fetch to get complete metrics
+        stopMetricsPolling()
+        fetchSessionMetrics(activeThreadIdRef.current)
+
         if (showProfileRef.current) {
           loadProfile()
         }
@@ -246,12 +301,13 @@ export function ChatProvider({ children }) {
           }
         })
         setIsStreaming(false)
+        stopMetricsPolling()
         break
 
       default:
         break
     }
-  }, [])
+  }, [fetchSessionMetrics, stopMetricsPolling])
 
   const refreshThreadTitle = useCallback(async (threadId) => {
     if (!threadId) return
@@ -372,6 +428,8 @@ export function ChatProvider({ children }) {
       documents,
       showDocuments,
       uploadStatuses,
+      sessionMetrics,
+      showObservability,
       loadThreads,
       createThread,
       selectThread,
@@ -386,6 +444,8 @@ export function ChatProvider({ children }) {
       uploadDocuments,
       deleteDocument,
       handleToggleDocuments,
+      setShowObservability,
+      fetchSessionMetrics,
     }}>
       {children}
     </ChatContext.Provider>

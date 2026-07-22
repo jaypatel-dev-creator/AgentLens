@@ -12,6 +12,8 @@ export default function ChatWindow() {
     isStreaming,
     memoryNotification,
     uploadStatuses,
+    showObservability,
+    setShowObservability,
   } = useChat();
   const bottomRef = useRef(null);
 
@@ -36,6 +38,22 @@ export default function ChatWindow() {
 
   return (
     <div className="flex-1 flex flex-col h-full">
+
+      {/* Header bar — observability toggle */}
+      <div className="flex items-center justify-end px-4 py-2 border-b border-gray-100">
+        <button
+          onClick={() => setShowObservability((prev) => !prev)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+            showObservability
+              ? "bg-indigo-50 text-indigo-600 border border-indigo-100"
+              : "bg-gray-50 text-gray-500 border border-gray-100 hover:bg-gray-100"
+          }`}
+        >
+          <span>🔭</span>
+          <span>{showObservability ? "Hide Observability" : "Show Observability"}</span>
+        </button>
+      </div>
+
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-2xl mx-auto space-y-6">

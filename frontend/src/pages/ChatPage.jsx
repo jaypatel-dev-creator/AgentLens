@@ -2,10 +2,11 @@ import { useEffect } from 'react'
 import Sidebar from '../components/Sidebar/Sidebar'
 import ChatWindow from '../components/Chat/ChatWindow'
 import ProfileViewer from '../components/Memory/ProfileViewer'
+import ObservabilityPanel from '../components/Observability/ObservabilityPanel'
 import { useChat } from '../context/ChatContext'
 
 export default function ChatPage() {
-  const { loadThreads, showProfile } = useChat()
+  const { loadThreads, showProfile, showObservability } = useChat()
 
   useEffect(() => {
     loadThreads()
@@ -18,6 +19,7 @@ export default function ChatPage() {
         <ChatWindow />
       </main>
       {showProfile && <ProfileViewer />}
+      {showObservability && <ObservabilityPanel />}
     </div>
   )
 }
