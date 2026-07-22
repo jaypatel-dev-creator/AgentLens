@@ -56,4 +56,3 @@ opentelemetry-distro==0.65b0
 opentelemetry-instrumentation==0.65b0
 opentelemetry-instrumentation-fastapi==0.65b0
 opentelemetry-instrumentation-logging==0.65b0
-openinference-instrumentation-langchain==0.1.29
