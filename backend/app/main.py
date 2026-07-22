@@ -15,7 +15,7 @@ from app.core.exceptions import (
 
 from app.api.routes import chat, threads, memory, health, documents, metrics
 from app.api.routes import auth
-from app.db.base import engine
+from app.db.base import engine, Base
 from app.db import models  # noqa: F401
 
 from app.agent.graph import compile_graph
@@ -55,8 +55,12 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Postgres mode — using DATABASE_URL")
 
-    # Schema is managed by Alembic — run `alembic upgrade head` before starting.
-    logger.info("Schema managed by Alembic migrations.")
+    if not settings.database_url:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("SQLite tables created.")
+    else:
+        logger.info("Schema managed by Alembic migrations.")
 
     # Agent graph compilation
     compile_graph()
