@@ -148,6 +148,12 @@ async def reasoner_node(
                 {"llm.model": "gemini-3.1-flash-lite"},
             )
 
+        # ── Per-session token recording ──────────────────────────────────────
+        # Reads session_id from the ContextVar set in stream_agent_response.
+        # No-op if session_id is "" (e.g. called outside a stream context).
+        session_id = tel.current_session_id.get()
+        tel.record_session_tokens(session_id, input_tokens, output_tokens, latency_ms)
+
         logger.info(
             "Reasoner complete — tokens: %d in / %d out | latency: %.1fms | tool_calls: %d",
             input_tokens,

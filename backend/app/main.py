@@ -13,7 +13,7 @@ from app.core.exceptions import (
     generic_exception_handler,
 )
 
-from app.api.routes import chat, threads, memory, health, documents
+from app.api.routes import chat, threads, memory, health, documents, metrics
 from app.api.routes import auth
 from app.db.base import engine
 from app.db import models  # noqa: F401
@@ -113,6 +113,7 @@ def create_app() -> FastAPI:
     app.include_router(threads.router, prefix="/threads", tags=["Threads"])
     app.include_router(memory.router, prefix="/memory", tags=["Memory"])
     app.include_router(documents.router, prefix="/documents", tags=["Documents"])
+    app.include_router(metrics.router, prefix="/metrics", tags=["Metrics"])
     app.include_router(health.router)
 
     return app

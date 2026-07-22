@@ -42,6 +42,10 @@ async def get_profile(db: AsyncSession, user_id: str) -> list[UserProfile]:
                     {"ltm.operation": "read"},
                 )
 
+            # ── Per-session LTM recording ────────────────────────────────────
+            session_id = tel.current_session_id.get()
+            tel.record_session_ltm(session_id, "read")
+
             logger.info(
                 "LTM read — user: %s | records: %d | latency: %.1fms",
                 user_id,
@@ -111,6 +115,10 @@ async def upsert_profile_entry(
                     1,
                     {"ltm.operation": "write"},
                 )
+
+            # ── Per-session LTM recording ────────────────────────────────────
+            session_id = tel.current_session_id.get()
+            tel.record_session_ltm(session_id, "write")
 
             logger.info(
                 "LTM write — user: %s | key: %s | latency: %.1fms",

@@ -6,6 +6,7 @@ from sqlalchemy import select
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from opentelemetry import trace
 
 from app.db.base import AsyncSessionLocal
 from app.db.models import Document
@@ -16,8 +17,10 @@ from app.memory.checkpointer import get_db_path, use_postgres_checkpointer
 from app.schemas.chat import ChatMessage
 from app.core.config import get_settings
 from app.core.logging import get_logger
+import app.telemetry as tel
 
 logger = get_logger(__name__)
+_tracer = trace.get_tracer("agentlens.chat")
 
 # Lazily initialized on first generate_title() call — not at import time.
 # Module-level init runs before lifespan setup and before .env is validated,
@@ -161,6 +164,15 @@ async def stream_agent_response(
     user_id: str,
 ) -> AsyncGenerator[str, None]:
 
+    # ── Session metrics init ─────────────────────────────────────────────────
+    # thread_id IS the session_id in AgentLens — the frontend holds it already.
+    # Set the ContextVar so reasoner, tool_executor, ltm_store, and rag/store
+    # can all read the current session_id without any signature changes.
+    tel.current_session_id.set(thread_id)
+    tel.init_session(thread_id)
+    if tel.active_sessions_gauge:
+        tel.active_sessions_gauge.add(1, {"session.id": thread_id})
+
     try:
         db_path = get_db_path()
         ltm_context = await build_ltm_context(db, user_id)
@@ -176,60 +188,76 @@ async def stream_agent_response(
             "doc_context": doc_context,
         }
 
-        async with get_checkpointer_context(db_path) as checkpointer:
-            graph_with_memory = get_graph_with_checkpointer(checkpointer, user_id)
-            async for event in graph_with_memory.astream_events(
-                input_state,
-                config=config,
-                version="v2",
-            ):
-                event_name = event.get("event")
-                event_data = event.get("data", {})
+        # ── Root span for the entire stream turn ────────────────────────────
+        # Wraps the full astream_events loop so SigNoz shows the complete
+        # request waterfall under one parent span with session.id attached.
+        with _tracer.start_as_current_span("agentlens.chat.stream") as span:
+            span.set_attribute("session.id", thread_id)
+            span.set_attribute("user.id", user_id)
+            span.set_attribute("chat.has_ltm", bool(ltm_context))
+            span.set_attribute("chat.has_docs", bool(doc_context))
 
-                if event_name == "on_chat_model_stream":
-                    chunk = event_data.get("chunk")
-                    if chunk and hasattr(chunk, "content") and chunk.content:
-                        text = extract_text_content(chunk.content)
-                        if text.strip():
-                            yield format_sse({"type": "text", "content": text})
+            async with get_checkpointer_context(db_path) as checkpointer:
+                graph_with_memory = get_graph_with_checkpointer(checkpointer, user_id)
+                async for event in graph_with_memory.astream_events(
+                    input_state,
+                    config=config,
+                    version="v2",
+                ):
+                    event_name = event.get("event")
+                    event_data = event.get("data", {})
 
-                elif event_name == "on_tool_start":
-                    tool_name = event.get("name", "")
-                    tool_input = event_data.get("input", {})
-                    yield format_sse({
-                        "type": "tool_start",
-                        "tool_name": tool_name,
-                        "tool_input": tool_input,
-                    })
+                    if event_name == "on_chat_model_stream":
+                        chunk = event_data.get("chunk")
+                        if chunk and hasattr(chunk, "content") and chunk.content:
+                            text = extract_text_content(chunk.content)
+                            if text.strip():
+                                yield format_sse({"type": "text", "content": text})
 
-                elif event_name == "on_tool_end":
-                    tool_name = event.get("name", "")
-                    raw_output = event_data.get("output", "")
-                    tool_output, sources = parse_tool_output(tool_name, raw_output)
-                    yield format_sse({
-                        "type": "tool_end",
-                        "tool_name": tool_name,
-                        "tool_output": tool_output,
-                        "sources": sources,
-                    })
+                    elif event_name == "on_tool_start":
+                        tool_name = event.get("name", "")
+                        tool_input = event_data.get("input", {})
+                        yield format_sse({
+                            "type": "tool_start",
+                            "tool_name": tool_name,
+                            "tool_input": tool_input,
+                        })
 
-            state = await graph_with_memory.aget_state(config)
-            if state and state.values.get("messages"):
-                async with AsyncSessionLocal() as fresh_db:
-                    try:
-                        saved_keys = await memory_writer_node(state.values, fresh_db, user_id)
-                        await fresh_db.commit()
-                        if saved_keys:
-                            yield format_sse({"type": "memory_update", "keys": saved_keys})
-                    except Exception as e:
-                        await fresh_db.rollback()
-                        logger.error(f"Memory writer failed for user {user_id}: {str(e)}")
+                    elif event_name == "on_tool_end":
+                        tool_name = event.get("name", "")
+                        raw_output = event_data.get("output", "")
+                        tool_output, sources = parse_tool_output(tool_name, raw_output)
+                        yield format_sse({
+                            "type": "tool_end",
+                            "tool_name": tool_name,
+                            "tool_output": tool_output,
+                            "sources": sources,
+                        })
+
+                state = await graph_with_memory.aget_state(config)
+                if state and state.values.get("messages"):
+                    async with AsyncSessionLocal() as fresh_db:
+                        try:
+                            saved_keys = await memory_writer_node(state.values, fresh_db, user_id)
+                            await fresh_db.commit()
+                            if saved_keys:
+                                yield format_sse({"type": "memory_update", "keys": saved_keys})
+                        except Exception as e:
+                            await fresh_db.rollback()
+                            logger.error(f"Memory writer failed for user {user_id}: {str(e)}")
 
         yield format_sse({"type": "done"})
 
     except Exception as e:
         logger.error(f"Stream error for user {user_id}: {str(e)}", exc_info=True)
         yield format_sse({"type": "error", "message": "Something went wrong. Please try again."})
+
+    finally:
+        # Always decrement active sessions — even on error or early exit
+        if tel.active_sessions_gauge:
+            tel.active_sessions_gauge.add(-1, {"session.id": thread_id})
+        # Reset ContextVar so it doesn't bleed into other requests
+        tel.current_session_id.set("")
 
 
 def build_chat_history(state) -> list[ChatMessage]:

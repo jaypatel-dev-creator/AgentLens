@@ -119,6 +119,10 @@ class ChromaVectorStore:
                     {"rag.backend": "chroma"},
                 )
 
+            # ── Per-session retrieval recording ──────────────────────────────
+            session_id = tel.current_session_id.get()
+            tel.record_session_retrieval(session_id, latency_ms)
+
             logger.info(
                 "RAG query chroma — results: %d/%d | latency: %.1fms",
                 len(chunks),
@@ -201,6 +205,10 @@ class PineconeVectorStore:
                     latency_ms,
                     {"rag.backend": "pinecone"},
                 )
+
+            # ── Per-session retrieval recording ──────────────────────────────
+            session_id = tel.current_session_id.get()
+            tel.record_session_retrieval(session_id, latency_ms)
 
             logger.info(
                 "RAG query pinecone — results: %d | latency: %.1fms",

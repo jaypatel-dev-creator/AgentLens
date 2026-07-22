@@ -18,6 +18,9 @@ async def tool_executor_node(state: AgentState, tools_by_name: dict[str, BaseToo
     tool_calls = last_message.tool_calls
     results = []
 
+    # Read session_id once for this node execution — same for all tool calls in this turn
+    session_id = tel.current_session_id.get()
+
     for tool_call in tool_calls:
         tool_name = tool_call["name"]
         tool_input = tool_call["args"]
@@ -35,6 +38,9 @@ async def tool_executor_node(state: AgentState, tools_by_name: dict[str, BaseToo
                 span.set_attribute("tool.success", False)
                 span.set_attribute("tool.error", "tool_not_found")
                 logger.warning("Tool '%s' not found — possible hallucination", tool_name)
+
+                # ── Per-session tool recording (not found) ───────────────────
+                tel.record_session_tool_call(session_id, tool_name, False, 0.0)
             else:
                 t0 = time.perf_counter()
                 try:
@@ -51,6 +57,9 @@ async def tool_executor_node(state: AgentState, tools_by_name: dict[str, BaseToo
                             1,
                             {"tool.name": tool_name, "tool.success": "true"},
                         )
+
+                    # ── Per-session tool recording (success) ─────────────────
+                    tel.record_session_tool_call(session_id, tool_name, True, latency_ms)
 
                     logger.info(
                         "Tool %s OK — latency: %.1fms | output: %s",
@@ -73,6 +82,9 @@ async def tool_executor_node(state: AgentState, tools_by_name: dict[str, BaseToo
                             1,
                             {"tool.name": tool_name, "tool.success": "false"},
                         )
+
+                    # ── Per-session tool recording (failure) ─────────────────
+                    tel.record_session_tool_call(session_id, tool_name, False, latency_ms)
 
                     logger.error("Tool %s failed — %s", tool_name, str(e))
 
