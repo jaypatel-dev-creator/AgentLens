@@ -93,7 +93,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    allowed_origins = [settings.frontend_url, "https://agent-lens.vercel.app"]
+    allowed_origins = [settings.frontend_url, "https://agent-lens-rosy.vercel.app"]
 
     app.add_middleware(
         CORSMiddleware,
