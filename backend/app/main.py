@@ -1,7 +1,6 @@
 from pathlib import Path
 from contextlib import asynccontextmanager
 import os
-import subprocess
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -63,7 +62,10 @@ async def lifespan(app: FastAPI):
         logger.info("SQLite tables created.")
     else:
         logger.info("Running Alembic migrations...")
-        subprocess.run(["alembic", "upgrade", "head"], check=True)
+        from alembic.config import Config
+        from alembic import command
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, "head")
         logger.info("Alembic migrations complete.")
 
     # Agent graph compilation
