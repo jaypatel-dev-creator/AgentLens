@@ -122,3 +122,9 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+
+
+
+://postgres:RIp8mGCWot503rdE@db.yvvpasiqkewqdmwebtya.supabase.co:5432/postgres
