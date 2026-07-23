@@ -1,6 +1,7 @@
 from pathlib import Path
 from contextlib import asynccontextmanager
 import os
+import subprocess
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -55,12 +56,15 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Postgres mode — using DATABASE_URL")
 
+    # Schema setup
     if not settings.database_url:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("SQLite tables created.")
     else:
-        logger.info("Schema managed by Alembic migrations.")
+        logger.info("Running Alembic migrations...")
+        subprocess.run(["alembic", "upgrade", "head"], check=True)
+        logger.info("Alembic migrations complete.")
 
     # Agent graph compilation
     compile_graph()

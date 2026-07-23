@@ -119,7 +119,6 @@ class ChromaVectorStore:
                     {"rag.backend": "chroma"},
                 )
 
-            # ── Per-session retrieval recording ──────────────────────────────
             session_id = tel.current_session_id.get()
             tel.record_session_retrieval(session_id, latency_ms)
 
@@ -206,7 +205,6 @@ class PineconeVectorStore:
                     {"rag.backend": "pinecone"},
                 )
 
-            # ── Per-session retrieval recording ──────────────────────────────
             session_id = tel.current_session_id.get()
             tel.record_session_retrieval(session_id, latency_ms)
 
@@ -220,25 +218,23 @@ class PineconeVectorStore:
 
     def delete_by_sha256(self, sha256: str, user_id: str) -> None:
         """
-        Use Pinecone's list API to fetch chunk IDs by prefix + metadata filter.
-        Avoids the zero-vector query hack — list() is designed exactly for ID lookup
-        without needing a query vector. Available since Pinecone client v3+.
+        Use Pinecone's list_paginated API to fetch chunk IDs by prefix.
         Chunk IDs are namespaced as {user_id}_{sha256}_{i}, so prefix filter is precise.
         """
         prefix = f"{user_id}_{sha256}_"
-        ids_to_delete = [
-            item.id
-            for item in self.index.list(prefix=prefix)
-        ]
+        ids_to_delete = []
+        for page in self.index.list_paginated(prefix=prefix):
+            ids_to_delete.extend([v.id for v in (page.vectors or [])])
         if ids_to_delete:
             self.index.delete(ids=ids_to_delete)
 
     def has_sha256(self, sha256: str, user_id: str) -> bool:
         """
-        Use Pinecone's list API to check existence by ID prefix.
+        Use Pinecone's list_paginated API to check existence by ID prefix.
         Returns True if any chunk with this user+sha256 combination exists.
         """
         prefix = f"{user_id}_{sha256}_"
-        for _ in self.index.list(prefix=prefix):
-            return True
+        for page in self.index.list_paginated(prefix=prefix):
+            if page.vectors:
+                return True
         return False
