@@ -55,18 +55,10 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Postgres mode — using DATABASE_URL")
 
-    # Schema setup
-    if not settings.database_url:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("SQLite tables created.")
-    else:
-        logger.info("Running Alembic migrations...")
-        from alembic.config import Config
-        from alembic import command
-        alembic_cfg = Config("alembic.ini")
-        command.upgrade(alembic_cfg, "head")
-        logger.info("Alembic migrations complete.")
+    #table creation (works for both local and prod)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database tables ready.")
 
     # Agent graph compilation
     compile_graph()
