@@ -217,14 +217,19 @@ class PineconeVectorStore:
             return chunks
 
     def delete_by_sha256(self, sha256: str, user_id: str) -> None:
-        """
-        Use Pinecone's list_paginated API to fetch chunk IDs by prefix.
-        Chunk IDs are namespaced as {user_id}_{sha256}_{i}, so prefix filter is precise.
-        """
         prefix = f"{user_id}_{sha256}_"
         ids_to_delete = []
-        for page in self.index.list_paginated(prefix=prefix):
+        pagination_token = None
+        while True:
+            page = self.index.list_paginated(
+                prefix=prefix,
+                pagination_token=pagination_token,
+            )
             ids_to_delete.extend([v.id for v in (page.vectors or [])])
+            if page.pagination and page.pagination.next:
+                pagination_token = page.pagination.next
+            else:
+                break
         if ids_to_delete:
             self.index.delete(ids=ids_to_delete)
 
@@ -234,7 +239,5 @@ class PineconeVectorStore:
         Returns True if any chunk with this user+sha256 combination exists.
         """
         prefix = f"{user_id}_{sha256}_"
-        for page in self.index.list_paginated(prefix=prefix):
-            if page.vectors:
-                return True
-        return False
+        page = self.index.list_paginated(prefix=prefix)
+        return bool(page.vectors)
