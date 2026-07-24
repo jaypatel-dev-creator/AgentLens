@@ -1,0 +1,78 @@
+locked: true
+locked_at: "2026-07-23"
+casting_yaml_version: "1.0.0"
+
+services:
+  backend:
+    provider: render
+    url: https://agentlens-9ari.onrender.com
+    runtime: python-3.11
+    build_command: pip install -r requirements.txt
+    start_command: >
+      opentelemetry-instrument
+      --traces_exporter otlp
+      --metrics_exporter otlp
+      --logs_exporter otlp
+      --exporter_otlp_endpoint https://ingest.us2.signoz.cloud:443
+      --exporter_otlp_headers signoz-ingestion-key=<SIGNOZ_INGESTION_KEY>
+      --service_name agentlens
+      uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    env_vars_required:
+      - GOOGLE_API_KEY
+      - TAVILY_API_KEY
+      - SIGNOZ_INGESTION_KEY
+      - OTLP_ENDPOINT
+      - OTEL_SERVICE_NAME
+      - JWT_SECRET_KEY
+      - FRONTEND_URL
+      - APP_ENV
+      - DATABASE_URL
+      - PINECONE_API_KEY
+      - PINECONE_INDEX_NAME
+      - OTEL_RESOURCE_ATTRIBUTES
+
+  frontend:
+    provider: vercel
+    url: https://agent-lens-rosy.vercel.app
+    framework: vite
+    root_directory: frontend
+    build_command: npm run build
+    output_directory: dist
+    env_vars_required:
+      - VITE_API_URL
+
+observability:
+  provider: signoz
+  region: us2
+  endpoint: https://ingest.us2.signoz.cloud:443
+  dashboard: pro-grouper.us2.signoz.cloud
+  metrics:
+    - agentlens.tokens.total
+    - agentlens.tool.calls.total
+    - agentlens.ltm.operations.total
+    - agentlens.retrieval.latency
+    - agentlens.llm.latency
+    - agentlens.sessions.active
+  alerts:
+    - name: High RAG Retrieval Latency
+      metric: agentlens.retrieval.latency.bucket
+      condition: p99 > 2000ms
+      window: 5m
+      severity: warning
+    - name: Token Cost Spike
+      metric: agentlens.tokens.total
+      condition: sum > 500
+      window: 5m
+      severity: warning
+
+vector_store:
+  provider: pinecone
+  index: agentlens
+  dimensions: 768
+  metric: cosine
+
+database:
+  provider: supabase
+  type: postgresql
+
+verified: true

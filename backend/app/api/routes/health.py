@@ -3,6 +3,7 @@ from sqlalchemy import text
 
 from app.db.base import AsyncSessionLocal
 from app.core.logging import get_logger
+from app.telemetry import is_telemetry_active
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -18,11 +19,14 @@ async def health():
         logger.error(f"Health check DB ping failed: {str(e)}")
         db_status = "unreachable"
 
+    telemetry_status = "active" if is_telemetry_active() else "inactive"
+
     healthy = db_status == "ok"
     return {
         "status": "ok" if healthy else "degraded",
-        "service": "Agent Lens",
+        "service": "AgentLens",
         "checks": {
             "database": db_status,
+            "telemetry": telemetry_status,
         },
     }, 200 if healthy else 503

@@ -31,8 +31,7 @@ def build_system_prompt(tools: list[BaseTool], ltm_context: str, doc_context: st
         f"- {t.name}: {t.description}" for t in tools
     )
 
-    base = f"""You are NeuroGraph AI — a smart, helpful, and conversational assistant with memory and tools.
-
+    base = f"""You are AgentLens — an intelligent, conversational AI agent with persistent memory, real-time tool access, and full observability. Every decision you make, every tool you call, and every token you consume is traced, measured, and visible in SigNoz. You remember past conversations, learn from interactions, and are transparent about what you're doing and why.
 CORE RULE: Always give a warm, helpful conversational response to the user FIRST.
 Never respond with only a MEMORY_UPDATE line. Always say something meaningful to the user.
 

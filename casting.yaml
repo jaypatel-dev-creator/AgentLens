@@ -1,5 +1,6 @@
-
 # SigNoz Cloud (us2 region) is used instead of self-hosted Foundry.
+# openinference-instrumentation-langchain was removed — incompatible with
+# Python 3.14 on Render. All LangGraph spans are instrumented manually.
 
 version: "1.0"
 
@@ -8,7 +9,6 @@ project:
   description: >
     Agentic RAG system with LangGraph + Gemini, fully instrumented with
     OpenTelemetry. Traces, metrics, and logs flow to SigNoz Cloud.
-    Agent can query its own observability data via SigNoz MCP.
 
 observability:
   provider: signoz-cloud
@@ -24,7 +24,6 @@ observability:
 instrumentation:
   auto:
     - opentelemetry-instrumentation-fastapi
-    - openinference-instrumentation-langchain
     - opentelemetry-instrumentation-logging
   manual:
     - agentlens.reasoner        # LLM call latency, token counts (input/output/total)
@@ -61,7 +60,7 @@ services:
   backend:
     runtime: python
     framework: fastapi
-    entrypoint: "opentelemetry-instrument uvicorn app.main:app --reload"
+    entrypoint: "opentelemetry-instrument uvicorn app.main:app"
     deploy: render
     env_vars_required:
       - GOOGLE_API_KEY

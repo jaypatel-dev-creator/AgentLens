@@ -1,11 +1,5 @@
-"""
-AgentLens — Metrics Routes
-Exposes per-session observability data for the frontend observability panel.
-All endpoints are auth-protected — a user can only query sessions they own
-(enforced by verifying the thread belongs to the current user).
-"""
-
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, get_current_user
@@ -46,12 +40,8 @@ async def get_session_metrics(
     summary = get_session_summary(session_id)
     if summary is None:
         # Session exists in DB but has no in-memory metrics yet.
-        # This is normal before the first message is sent, or after TTL expiry.
-        raise HTTPException(
-            status_code=404,
-            detail=f"No metrics available for session '{session_id}'. "
-                   "Send a message first to start recording.",
-        )
+        # Normal before the first message is sent, or after TTL expiry.
+        return Response(status_code=204)
 
     logger.debug(
         "Metrics fetched — session: %s | tokens: %d | tools: %d",

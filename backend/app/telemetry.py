@@ -14,6 +14,7 @@ import threading
 import time
 from contextvars import ContextVar
 from opentelemetry import trace, metrics
+from opentelemetry.trace import NonRecordingSpan
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,7 @@ def setup_telemetry(
     otlp_endpoint: str,
     otlp_headers: dict,
 ) -> None:
-    
+
     global token_cost_counter, tool_call_counter, ltm_operation_counter
     global retrieval_latency_histogram, llm_latency_histogram, active_sessions_gauge
 
@@ -187,6 +188,21 @@ def setup_telemetry(
         service_name,
         otlp_endpoint,
     )
+
+
+def is_telemetry_active() -> bool:
+    """
+    Returns True if a real SDK TracerProvider is registered.
+    Returns False if OTel was never initialised (NoOpTracerProvider).
+
+    The opentelemetry-instrument CLI installs a real provider before
+    the app starts; if it didn't run, get_tracer() returns a no-op
+    tracer whose spans are NonRecordingSpan instances.
+    """
+    test_span = trace.get_tracer("agentlens.healthcheck").start_span("_healthcheck")
+    active = not isinstance(test_span, NonRecordingSpan)
+    test_span.end()
+    return active
 
 
 def get_tracer(name: str = "agentlens"):
