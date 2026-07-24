@@ -40,8 +40,6 @@ class Thread(Base):
 
 
 # UserProfile model — LTM entries, scoped to user
-# PK changed from (key) → composite (user_id, key)
-# so the same key e.g. "name" can exist for multiple users independently
 class UserProfile(Base):
     __tablename__ = "user_profile"
 
@@ -56,8 +54,6 @@ class UserProfile(Base):
 
 
 # Document model — tracks uploaded files for RAG, scoped to user
-# PK changed from (sha256) → composite (user_id, sha256)
-# so two users uploading the same file are deduped independently per user
 class Document(Base):
     __tablename__ = "documents"
 

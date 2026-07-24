@@ -60,9 +60,7 @@ def compile_graph() -> None:
     """
     global _initialized
 
-    # Validate the full construction path with a real (non-placeholder) tool set.
-    # Any import errors, bad config, or API key issues surface here at startup,
-    # not mid-request.
+    
     tools = get_tools("__startup__")
     tools_by_name = get_tools_by_name(tools)
     llm_with_tools = build_llm_with_tools(tools)

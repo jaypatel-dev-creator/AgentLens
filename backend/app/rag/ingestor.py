@@ -23,9 +23,7 @@ CHUNK_OVERLAP = 200
 TOP_K = 3
 SIMILARITY_THRESHOLD = 0.5
 
-# Lazily initialized on first embed call — not at import time.
-# Module-level init fires before lifespan setup and before .env is validated,
-# causing opaque crashes if google_api_key is missing.
+#gemini client singleton 
 _genai_client: genai.Client | None = None
 
 
@@ -36,7 +34,7 @@ def _get_genai_client() -> genai.Client:
     return _genai_client
 
 
-# Text splitter — safe to initialize at module level (no config dependency)
+# Text splitter singleton 
 _splitter = RecursiveCharacterTextSplitter(
     chunk_size=CHUNK_SIZE,
     chunk_overlap=CHUNK_OVERLAP,
