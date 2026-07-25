@@ -272,8 +272,16 @@ Upload → validate (size, type, page count) → SHA256 dedup check
 
 **Vector store switching:** env-based. `PINECONE_API_KEY` absent → ChromaDB. Present → Pinecone. Both implement the same interface (`add`, `query`, `delete_by_sha256`, `has_sha256`).
 
----
 
+### Agentic Document Context Injection
+
+Before each request, `build_doc_context()` in `chat_service.py` queries the database for the user's uploaded documents and injects the result directly into the system prompt as `doc_context`.
+
+- **No documents uploaded** → agent receives `[System: User has no documents uploaded. Do not call document_search.]` — the tool call is eliminated before reasoning begins
+- **Documents exist** → agent receives filenames and an instruction to only call `document_search` when the query is document-relevant
+
+This means the agent's decision to query the vector store is grounded in live database state, not prompt guessing. It eliminates unnecessary Pinecone round trips and prevents the agent from hallucinating document content when none exists.
+---
 ## Exception Hierarchy
 
 ```

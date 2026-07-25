@@ -42,6 +42,17 @@ The agent can:
 
 While you chat, the right sidebar shows you token consumption, LLM latency, tool calls with individual timings, RAG retrieval results, and LTM read/write counts — all pulled from a live `/metrics/session` endpoint that aggregates from the same OTel instrumentation flowing to SigNoz.
 
+### Agentic Document Context Injection
+
+Before each request, `build_doc_context()` in `chat_service.py` queries the database for the user's uploaded documents and injects the result directly into the system prompt as `doc_context`.
+
+- **No documents uploaded** → agent receives `[System: User has no documents uploaded. Do not call document_search.]` — the tool call is eliminated before reasoning begins
+- **Documents exist** → agent receives filenames and an instruction to only call `document_search` when the query is document-relevant
+
+This means the agent's decision to query the vector store is grounded in live database state, not prompt guessing. It eliminates unnecessary Pinecone round trips and prevents the agent from hallucinating document content when none exists.
+
+
+
 ---
 
 ## Architecture
