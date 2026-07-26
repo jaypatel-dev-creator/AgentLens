@@ -241,7 +241,7 @@ Everything below was designed and built during the hackathon week (July 20–25,
 
 ## AI Tool Usage Disclosure
 
-This project was built with assistance from Claude (Anthropic) for architectural decisions, debugging, and code review. All instrumentation design, implementation, and deployment were done by the developer.
+This project was built with assistance from Claude (Anthropic) for architectural decisions, debugging, and code review. All instrumentation design, implementation, and deployment were done by me. 
 
 ---
 

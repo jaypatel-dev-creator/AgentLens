@@ -6,7 +6,7 @@ services:
   backend:
     provider: render
     url: https://agentlens-9ari.onrender.com
-    runtime: python-3.14
+    runtime: python-3.11.9
     build_command: pip install -r requirements.txt
     start_command: >
       opentelemetry-instrument

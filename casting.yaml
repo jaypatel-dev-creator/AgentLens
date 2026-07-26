@@ -1,6 +1,7 @@
 # SigNoz Cloud (us2 region) is used instead of self-hosted Foundry.
 # openinference-instrumentation-langchain was removed — incompatible with
-# Python 3.14 on Render. All LangGraph spans are instrumented manually.
+# Python 3.14 during initial setup. Running Python 3.11.9 on Render.
+# All LangGraph spans are instrumented manually.
 
 version: "1.0"
 
@@ -58,7 +59,7 @@ metrics:
 
 services:
   backend:
-    runtime: python
+    runtime: python-3.11.9
     framework: fastapi
     entrypoint: "opentelemetry-instrument uvicorn app.main:app"
     deploy: render
@@ -80,11 +81,11 @@ services:
 alerts:
   - name: high_retrieval_latency
     metric: agentlens.retrieval.latency
-    condition: p95 > 2000
+    condition: p99 > 2000
     unit: ms
     severity: warning
-  - name: high_token_cost_per_session
+  - name: token_cost_spike
     metric: agentlens.tokens.total
-    condition: sum > 5000
+    condition: sum > 500
     window: 5m
     severity: warning
