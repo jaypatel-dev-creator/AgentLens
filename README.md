@@ -15,6 +15,11 @@
 
 **Live Demo:** [agent-lens-rosy.vercel.app](https://agent-lens-rosy.vercel.app) · **Backend:** [agentlens-9ari.onrender.com](https://agentlens-9ari.onrender.com) · **Track:** AI & Agent Observability
 
+## Demo
+
+[![AgentLens Demo](https://img.shields.io/badge/YouTube-Demo-red?style=flat&logo=youtube)](https://youtu.be/3Hj70CUGQ7c)
+---
+
 Built for the [Agents of SigNoz Hackathon](https://wemakedevs.org/hackathons/signoz) — WeMakeDevs × SigNoz, July 20–26, 2026.
 
 ---
@@ -174,8 +179,10 @@ See [`frontend/README.md`](./frontend/README.md) for frontend setup.
 ## Known Limitations
 
 - Observability sidebar session metrics are in-memory with a 1-hour TTL — won't persist across backend restarts
+- Render free tier cold-starts after 15 minutes of inactivity — first request may take 30–50 seconds to respond
 
 ---
+
 
 ## Health Check
 
