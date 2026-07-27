@@ -15,9 +15,7 @@
 
 **Live Demo:** [agent-lens-rosy.vercel.app](https://agent-lens-rosy.vercel.app) · **Backend:** [agentlens-9ari.onrender.com](https://agentlens-9ari.onrender.com) · **Track:** AI & Agent Observability
 
-## Demo
 
-[![AgentLens Demo](https://img.shields.io/badge/YouTube-Demo-red?style=flat&logo=youtube)](https://youtu.be/3Hj70CUGQ7c)
 ---
 
 Built for the [Agents of SigNoz Hackathon](https://wemakedevs.org/hackathons/signoz) — WeMakeDevs × SigNoz, July 20–26, 2026.
